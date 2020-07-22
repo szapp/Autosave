@@ -30,6 +30,7 @@ const int    NINJA_AUTOSAVE_SLOT_MAX  = 20;
 const string NINJA_AUTOSAVE_NAME_PRE  = "    - Auto Save ";
 const string NINJA_AUTOSAVE_NAME_POST = " -";
 const int    NINJA_AUTOSAVE_DELAY     = 0; // Internal
+const int    NINJA_AUTOSAVE_TRIGGER   = 0; // Internal
 var   int    Ninja_Autosave_FF;            // Internal
 
 /*
@@ -79,16 +80,13 @@ func int Ninja_Autosave_Allow() {
 };
 
 /*
- * Trigger function called repeatedly
+ * The write function has to be decoupled from the FrameFunction, because writing a game save re-triggers the
+ * FrameFunctions causing an infinite loop. Aside from that, the properties of other active FrameFunctions will be
+ * overwritten, because of pseudo-locals in the FrameFunctions hook. This method here adds more code, but is safer.
  */
 func void Ninja_Autosave() {
-    var FFItem this; this = get(Ninja_Autosave_FF);
-    if (Ninja_Autosave_Allow()) {
-        // After waiting, add some buffer time before immediately saving
-        if (!this.delay) {
-            this.delay = 500;
-            return;
-        };
+    if (NINJA_AUTOSAVE_TRIGGER) {
+        NINJA_AUTOSAVE_TRIGGER = FALSE;
 
         // Indicate auto save
         PrintScreen("Auto Save", -1, 1, "FONT_OLD_10_WHITE.TGA", 1);
@@ -119,9 +117,6 @@ func void Ninja_Autosave() {
             };
         };
 
-        // Add delay to avoid infinite loop
-        this.next += NINJA_AUTOSAVE_DELAY;
-
         // Save game to save slot
         const int CGameManager__Write_Savegame_G1 = 4360080; //0x428790
         const int CGameManager__Write_Savegame_G2 = 4367056; //0x42A2D0
@@ -132,6 +127,23 @@ func void Ninja_Autosave() {
                                                                              CGameManager__Write_Savegame_G2));
             call = CALL_End();
         };
+    };
+};
+
+
+/*
+ * Trigger function called repeatedly
+ */
+func void Ninja_Autosave_Check() {
+    var FFItem this; this = get(Ninja_Autosave_FF);
+    if (Ninja_Autosave_Allow()) {
+        // After waiting, add some buffer time before immediately saving
+        if (!this.delay) {
+            this.delay = 500;
+        } else {
+            NINJA_AUTOSAVE_TRIGGER = TRUE;
+        };
+
     } else if (this.delay) {
         MEM_Info("Autosave: Waiting to perform auto-save.");
         this.delay = 0;
@@ -200,10 +212,13 @@ func void _Ninja_Autosave_Init() {
         Ninja_Autosave_ReadIni();
         HookEngineF(CGameManager__ApplySomeSettings, MEMINT_SwitchG1G2(7, 8), Ninja_Autosave_ReadIni);
 
+        // Start the writer (separately from the check in FF)
+        HookEngineF(oCGame__Render, 7, Ninja_Autosave);
+
         // Start frame function and store handle
-        if (!FF_Active(Ninja_Autosave)) {
-            FF_ApplyExtGT(Ninja_Autosave, NINJA_AUTOSAVE_DELAY, -1);
-            Ninja_Autosave_FF = numHandles();
+        if (!FF_Active(Ninja_Autosave_Check)) {
+            FF_ApplyExtGT(Ninja_Autosave_Check, NINJA_AUTOSAVE_DELAY, -1);
+            Ninja_Autosave_FF = nextHandle;
         };
 
         // Reset delay after saving/loading
