@@ -7,22 +7,7 @@ func void Ninja_Autosave_Menu(var int menuPtr) {
     if (!once) {
         // Initialize Ikarus
         MEM_InitAll();
-
-        MEM_Info("Autosave: Initializing entries in Gothic.ini.");
-        if (!MEM_GothOptExists("AUTOSAVE", "minutes")) {
-            MEM_SetGothOpt("AUTOSAVE", "minutes", IntToString(NINJA_AUTOSAVE_MINUTES));
-        };
-        if (!MEM_GothOptExists("AUTOSAVE", "slotMin")) {
-            MEM_SetGothOpt("AUTOSAVE", "slotMin", IntToString(MEMINT_SwitchG1G2(13, 18)));
-        };
-        if (!MEM_GothOptExists("AUTOSAVE", "slotMax")) {
-            MEM_SetGothOpt("AUTOSAVE", "slotMax", IntToString(MEMINT_SwitchG1G2(15, 20)));
-        };
-
-        NINJA_AUTOSAVE_MINUTES  = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "minutes"));
-        NINJA_AUTOSAVE_SLOT_MIN = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "slotMin"));
-        NINJA_AUTOSAVE_SLOT_MAX = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "slotMax"));
-
+        Ninja_Autosave_ReadIni();
         once = 1;
     };
 };
