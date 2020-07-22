@@ -60,6 +60,13 @@ func int Ninja_Autosave_Allow() {
         return FALSE;
     };
 
+    // Capture cut scene camera
+    const int zCCSCamera__inGameCamStored_G1 = 8833016; //0x86C7F8
+    const int zCCSCamera__inGameCamStored_G2 = 9245096; //0x8D11A8
+    if (MEM_ReadInt(MEMINT_SwitchG1G2(zCCSCamera__inGameCamStored_G1, zCCSCamera__inGameCamStored_G2))) {
+        return FALSE;
+    };
+
     // Check for EnforceSavingPolicy script
     if (MEM_FindParserSymbol("AllowSaving") != -1) {
         MEM_CallByString("AllowSaving");
@@ -77,6 +84,13 @@ func int Ninja_Autosave_Allow() {
 func void Ninja_Autosave() {
     var FFItem this; this = get(Ninja_Autosave_FF);
     if (Ninja_Autosave_Allow()) {
+        // After waiting, add some buffer time before immediately saving
+        if (!this.delay) {
+            this.delay = 500;
+            return;
+        };
+
+        // Indicate auto save
         PrintScreen("Auto Save", -1, 1, "FONT_OLD_10_WHITE.TGA", 1);
 
         // Rotate slot number
