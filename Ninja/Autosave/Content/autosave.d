@@ -185,6 +185,9 @@ func void Ninja_Autosave_ReadIni() {
     };
 
     // Convert delay to milliseconds
+    if (NINJA_AUTOSAVE_MINUTES) <= 0 {
+        NINJA_AUTOSAVE_MINUTES = 1;
+    };
     NINJA_AUTOSAVE_DELAY = NINJA_AUTOSAVE_MINUTES * 60 * 1000;
 };
 
