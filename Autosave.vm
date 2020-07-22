@@ -1,0 +1,21 @@
+[BEGINVDF]
+Comment=This patch (Gothic 1 and Gothic 2 NotR) introduces auto saving.%%NFrequency and slots to use are adjustable in the Gothic.ini
+BaseDir=.\
+VDFName=.\Autosave.vdf
+
+[FILES]
+; Resources (list the specific files from _work here)
+; _work\* -r
+
+; Script files
+Ninja\Autosave\* -r
+
+[EXCLUDE]
+_work\Data\Scripts\* -r
+*.vm
+*.vdf
+*.bat
+
+[INCLUDE]
+
+[ENDVDF]
