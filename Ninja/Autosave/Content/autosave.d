@@ -30,10 +30,11 @@ const int    NINJA_AUTOSAVE_SLOT_MAX  = 20;
 const string NINJA_AUTOSAVE_NAME_PRE  = "    - Auto Save ";
 const string NINJA_AUTOSAVE_NAME_POST = " -";
 const int    NINJA_AUTOSAVE_DEBUG     = 0;
-const int    NINJA_AUTOSAVE_DELAY     = 0; // Internal
-const int    NINJA_AUTOSAVE_EASE      = 0; // Internal
-const int    NINJA_AUTOSAVE_TRIGGER   = 0; // Internal
-var   int    Ninja_Autosave_FF;            // Internal
+const int    NINJA_AUTOSAVE_DELAY     = 0;   // Internal
+const int    NINJA_AUTOSAVE_BUFFER    = 500; // Internal
+const int    NINJA_AUTOSAVE_EASE      = 0;   // Internal
+const int    NINJA_AUTOSAVE_TRIGGER   = 0;   // Internal
+var   int    Ninja_Autosave_FF;              // Internal
 
 
 /*
@@ -104,8 +105,13 @@ func int Ninja_Autosave_Allow() {
 func void Ninja_Autosave() {
     if (NINJA_AUTOSAVE_DEBUG) {
         var FFItem ff; ff = get(Ninja_Autosave_FF);
-        var int rem; rem = (ff.next - TimerGT()) / 1000;
-        if (rem > 0) { Ninja_Autosave_DebugPrint(ConcatStrings("Seconds until next save: ", IntToString(rem))); };
+        var int msTotal; msTotal = (ff.next - TimerGT()) * (ff.delay > NINJA_AUTOSAVE_BUFFER);
+        var int sec; sec = ((msTotal + 999) / 1000) % 60;
+        var int min; min = ((msTotal + 999) / 1000) / 60;
+        var string secStr; secStr = IntToString(sec);
+        if (sec < 10) { secStr = ConcatStrings("0", secStr); };
+        var string timeStr; timeStr = ConcatStrings(ConcatStrings(IntToString(min), ":"), secStr);
+        if (min > 0) || (sec > 0) { Ninja_Autosave_DebugPrint(ConcatStrings("Saving in ", timeStr)); };
     };
 
     if (NINJA_AUTOSAVE_TRIGGER) {
@@ -162,7 +168,7 @@ func void Ninja_Autosave_Check() {
     if (Ninja_Autosave_Allow()) {
         // After waiting, add some buffer time before immediately saving
         if (!this.delay) {
-            this.delay = 500 + NINJA_AUTOSAVE_EASE;
+            this.delay = NINJA_AUTOSAVE_BUFFER + NINJA_AUTOSAVE_EASE;
             NINJA_AUTOSAVE_EASE = 0;
         } else {
             NINJA_AUTOSAVE_TRIGGER = TRUE;
