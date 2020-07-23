@@ -29,9 +29,21 @@ const int    NINJA_AUTOSAVE_SLOT_MIN  = 18; // 0 is quick save
 const int    NINJA_AUTOSAVE_SLOT_MAX  = 20;
 const string NINJA_AUTOSAVE_NAME_PRE  = "    - Auto Save ";
 const string NINJA_AUTOSAVE_NAME_POST = " -";
+const int    NINJA_AUTOSAVE_DEBUG     = 0;
 const int    NINJA_AUTOSAVE_DELAY     = 0; // Internal
+const int    NINJA_AUTOSAVE_EASE      = 0; // Internal
 const int    NINJA_AUTOSAVE_TRIGGER   = 0; // Internal
 var   int    Ninja_Autosave_FF;            // Internal
+
+
+/*
+ * Debugging function
+ */
+func void Ninja_Autosave_DebugPrint(var string reason) {
+    if (NINJA_AUTOSAVE_DEBUG) {
+        PrintScreen(reason, 1, 1, "FONT_OLD_10_WHITE.TGA", 1);
+    };
+};
 
 /*
  * Check if saving is currently possible
@@ -51,6 +63,7 @@ func int Ninja_Autosave_Allow() {
         call = CALL_End();
     };
     if (!enable) {
+        Ninja_Autosave_DebugPrint("Engine disallows saving");
         return FALSE;
     };
 
@@ -58,13 +71,16 @@ func int Ninja_Autosave_Allow() {
     const int oCZoneMusic__s_herostatus_G1 =  9299208; //0x8DE508
     const int oCZoneMusic__s_herostatus_G2 = 10111520; //0x9A4A20
     if (MEM_ReadInt(MEMINT_SwitchG1G2(oCZoneMusic__s_herostatus_G1, oCZoneMusic__s_herostatus_G2))) {
+        Ninja_Autosave_DebugPrint("Currently in combat");
         return FALSE;
     };
 
-    // Capture cut scene camera
-    const int zCCSCamera__inGameCamStored_G1 = 8833016; //0x86C7F8
-    const int zCCSCamera__inGameCamStored_G2 = 9245096; //0x8D11A8
-    if (MEM_ReadInt(MEMINT_SwitchG1G2(zCCSCamera__inGameCamStored_G1, zCCSCamera__inGameCamStored_G2))) {
+    // Check for playing cut scene camera
+    const int zCCSCamera__playing_G1 = 8833024; //0x86C800
+    const int zCCSCamera__playing_G2 = 9245104; //0x8D11B0
+    if (MEM_ReadInt(MEMINT_SwitchG1G2(zCCSCamera__playing_G1, zCCSCamera__playing_G2))) {
+        Ninja_Autosave_DebugPrint("Cut scene camera is playing");
+        NINJA_AUTOSAVE_EASE = 5000;
         return FALSE;
     };
 
@@ -72,6 +88,7 @@ func int Ninja_Autosave_Allow() {
     if (MEM_FindParserSymbol("AllowSaving") != -1) {
         MEM_CallByString("AllowSaving");
         if (!MEM_PopIntResult()) {
+            Ninja_Autosave_DebugPrint("Scripts disallow saving");
             return FALSE;
         };
     };
@@ -85,6 +102,12 @@ func int Ninja_Autosave_Allow() {
  * overwritten, because of pseudo-locals in the FrameFunctions hook. This method here adds more code, but is safer.
  */
 func void Ninja_Autosave() {
+    if (NINJA_AUTOSAVE_DEBUG) {
+        var FFItem ff; ff = get(Ninja_Autosave_FF);
+        var int rem; rem = (ff.next - TimerGT()) / 1000;
+        if (rem > 0) { Ninja_Autosave_DebugPrint(ConcatStrings("Seconds until next save: ", IntToString(rem))); };
+    };
+
     if (NINJA_AUTOSAVE_TRIGGER) {
         NINJA_AUTOSAVE_TRIGGER = FALSE;
 
@@ -139,7 +162,8 @@ func void Ninja_Autosave_Check() {
     if (Ninja_Autosave_Allow()) {
         // After waiting, add some buffer time before immediately saving
         if (!this.delay) {
-            this.delay = 500;
+            this.delay = 500 + NINJA_AUTOSAVE_EASE;
+            NINJA_AUTOSAVE_EASE = 0;
         } else {
             NINJA_AUTOSAVE_TRIGGER = TRUE;
         };
@@ -183,6 +207,7 @@ func void Ninja_Autosave_ReadIni() {
     NINJA_AUTOSAVE_MINUTES  = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "minutes"));
     NINJA_AUTOSAVE_SLOT_MIN = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "slotMin"));
     NINJA_AUTOSAVE_SLOT_MAX = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "slotMax"));
+    NINJA_AUTOSAVE_DEBUG    = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "debug"));
 
     // Verify auto save slot number range
     var int slotMax; slotMax = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1224*/8196644, /*0x82F2D0*/8581840));
@@ -212,14 +237,14 @@ func void _Ninja_Autosave_Init() {
         Ninja_Autosave_ReadIni();
         HookEngineF(CGameManager__ApplySomeSettings, MEMINT_SwitchG1G2(7, 8), Ninja_Autosave_ReadIni);
 
-        // Start the writer (separately from the check in FF)
-        HookEngineF(oCGame__Render, 7, Ninja_Autosave);
-
         // Start frame function and store handle
         if (!FF_Active(Ninja_Autosave_Check)) {
             FF_ApplyExtGT(Ninja_Autosave_Check, NINJA_AUTOSAVE_DELAY, -1);
             Ninja_Autosave_FF = nextHandle;
         };
+
+        // Start the writer (separately from the check in FF)
+        HookEngineF(oCGame__Render, 7, Ninja_Autosave);
 
         // Reset delay after saving/loading
         Ninja_Autosave_Reset();
