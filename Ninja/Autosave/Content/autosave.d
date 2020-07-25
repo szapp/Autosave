@@ -31,7 +31,7 @@ const string NINJA_AUTOSAVE_NAME_PRE  = "    - Auto Save ";
 const string NINJA_AUTOSAVE_NAME_POST = " -";
 const int    NINJA_AUTOSAVE_DEBUG     = 0;
 const int    NINJA_AUTOSAVE_DELAY     = 0;   // Internal
-const int    NINJA_AUTOSAVE_BUFFER    = 500; // Internal
+const int    NINJA_AUTOSAVE_BUFFER    = 750; // Internal
 const int    NINJA_AUTOSAVE_EASE      = 0;   // Internal
 const int    NINJA_AUTOSAVE_TRIGGER   = 0;   // Internal
 var   int    Ninja_Autosave_FF;              // Internal
@@ -169,10 +169,10 @@ func void Ninja_Autosave_Check() {
         // After waiting, add some buffer time before immediately saving
         if (!this.delay) {
             this.delay = NINJA_AUTOSAVE_BUFFER + NINJA_AUTOSAVE_EASE;
-            NINJA_AUTOSAVE_EASE = 0;
         } else {
             NINJA_AUTOSAVE_TRIGGER = TRUE;
         };
+        NINJA_AUTOSAVE_EASE = 0;
 
     } else if (this.delay) {
         MEM_Info("Autosave: Waiting to perform auto-save.");
@@ -188,6 +188,36 @@ func void Ninja_Autosave_Reset() {
     var FFItem ff; ff = get(Ninja_Autosave_FF);
     ff.delay = NINJA_AUTOSAVE_DELAY;
     ff.next = TimerGT() + ff.delay;
+};
+
+/*
+ * Set the delay to trigger soon
+ */
+func void Ninja_Autosave_TriggerDelayed(var int ms) {
+    // If last save occurred more than 10 seconds ago or if saving is not possible anyway
+    var FFItem ff; ff = get(Ninja_Autosave_FF);
+    if (!NINJA_AUTOSAVE_TRIGGER) && (ff.delay) {
+        if (!Ninja_Autosave_Allow()) || ((ff.delay - (ff.next - TimerGT())) > (10000 - ms)) {
+            // Trigger an auto save after a few milliseconds
+            ff.next = TimerGT() + ms;
+        };
+    };
+};
+
+/*
+ * Trigger saving on IntroduceChapter
+ */
+func void Ninja_Autosave_OnIntroduceChapter() {
+    Ninja_Autosave_TriggerDelayed(2000);
+};
+
+/*
+ * Trigger saving on Log_SetTopicStatus
+ */
+func void Ninja_Autosave_OnChangeTopicStatus() {
+    if (EBX == /*LOG_SUCCESS*/ 2) {
+        Ninja_Autosave_TriggerDelayed(2000);
+    };
 };
 
 /*
@@ -255,5 +285,16 @@ func void _Ninja_Autosave_Init() {
         // Reset delay after saving/loading
         Ninja_Autosave_Reset();
         HookEngineF(oCSavegameManager__SetAndWriteSavegame, 5, Ninja_Autosave_Reset);
+
+        // Event-based saving
+        const int IntroduceChapter_G1          = 6678032; //0x65E610
+        const int IntroduceChapter_G2          = 7320800; //0x6FB4E0
+        const int Log_SetTopicStatus_status_G1 = 6633725; //0x6538FD
+        const int Log_SetTopicStatus_status_G2 = 7225165; //0x6E3F4D
+        HookEngineF(MEMINT_SwitchG1G2(IntroduceChapter_G1,
+                                      IntroduceChapter_G2), 7, Ninja_Autosave_OnIntroduceChapter);
+        HookEngineF(MEMINT_SwitchG1G2(Log_SetTopicStatus_status_G1,
+                                      Log_SetTopicStatus_status_G2), 6, Ninja_Autosave_OnChangeTopicStatus);
+
     };
 };
