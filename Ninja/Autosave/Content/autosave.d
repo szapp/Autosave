@@ -17,6 +17,7 @@
  *     minutes=10  // Saving frequency in minutes
  *     slotMin=18  // Range of saving slots to use
  *     slotMax=20  // i.e. here: use slots 18, 19 and 20
+ *     events=1    // Also save after events (0 = no, 1 = yes)
  *     counter=0   // Counter in the save slot name (increased internally)
  *
  *
@@ -24,12 +25,13 @@
  */
 
 /* Default values of constants */
-const int    NINJA_AUTOSAVE_MINUTES   = 10;
+const int    NINJA_AUTOSAVE_MINUTES   = 5;
 const int    NINJA_AUTOSAVE_SLOT_MIN  = 18; // 0 is quick save
 const int    NINJA_AUTOSAVE_SLOT_MAX  = 20;
+const int    NINJA_AUTOSAVE_EVENTS    = 1;
+const int    NINJA_AUTOSAVE_DEBUG     = 0;
 const string NINJA_AUTOSAVE_NAME_PRE  = "    - Auto Save ";
 const string NINJA_AUTOSAVE_NAME_POST = " -";
-const int    NINJA_AUTOSAVE_DEBUG     = 0;
 const int    NINJA_AUTOSAVE_DELAY     = 0;   // Internal
 const int    NINJA_AUTOSAVE_BUFFER    = 750; // Internal
 const int    NINJA_AUTOSAVE_EASE      = 0;   // Internal
@@ -235,6 +237,9 @@ func void Ninja_Autosave_ReadIni() {
     if (!MEM_GothOptExists("AUTOSAVE", "slotMax")) {
         MEM_SetGothOpt("AUTOSAVE", "slotMax", IntToString(MEMINT_SwitchG1G2(15, 20)));
     };
+    if (!MEM_GothOptExists("AUTOSAVE", "events")) {
+        MEM_SetGothOpt("AUTOSAVE", "events", IntToString(NINJA_AUTOSAVE_EVENTS));
+    };
     if (STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "counter")) < 1) { // Force non-negative values
         MEM_SetGothOpt("AUTOSAVE", "counter", "0");
     };
@@ -243,6 +248,7 @@ func void Ninja_Autosave_ReadIni() {
     NINJA_AUTOSAVE_MINUTES  = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "minutes"));
     NINJA_AUTOSAVE_SLOT_MIN = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "slotMin"));
     NINJA_AUTOSAVE_SLOT_MAX = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "slotMax"));
+    NINJA_AUTOSAVE_EVENTS   = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "events"));
     NINJA_AUTOSAVE_DEBUG    = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "debug"));
 
     // Verify auto save slot number range
@@ -291,10 +297,17 @@ func void _Ninja_Autosave_Init() {
         const int IntroduceChapter_G2          = 7320800; //0x6FB4E0
         const int Log_SetTopicStatus_status_G1 = 6633725; //0x6538FD
         const int Log_SetTopicStatus_status_G2 = 7225165; //0x6E3F4D
-        HookEngineF(MEMINT_SwitchG1G2(IntroduceChapter_G1,
-                                      IntroduceChapter_G2), 7, Ninja_Autosave_OnIntroduceChapter);
-        HookEngineF(MEMINT_SwitchG1G2(Log_SetTopicStatus_status_G1,
-                                      Log_SetTopicStatus_status_G2), 6, Ninja_Autosave_OnChangeTopicStatus);
-
+        if (NINJA_AUTOSAVE_EVENTS) {
+            HookEngineF(MEMINT_SwitchG1G2(IntroduceChapter_G1,
+                                          IntroduceChapter_G2), 7, Ninja_Autosave_OnIntroduceChapter);
+            HookEngineF(MEMINT_SwitchG1G2(Log_SetTopicStatus_status_G1,
+                                          Log_SetTopicStatus_status_G2), 6, Ninja_Autosave_OnChangeTopicStatus);
+        } else {
+            // When disabling during the game (i.e. if there was menu option), remove the hook
+            RemoveHookF(MEMINT_SwitchG1G2(IntroduceChapter_G1,
+                                          IntroduceChapter_G2), 7, Ninja_Autosave_OnIntroduceChapter);
+            RemoveHookF(MEMINT_SwitchG1G2(Log_SetTopicStatus_status_G1,
+                                          Log_SetTopicStatus_status_G2), 6, Ninja_Autosave_OnChangeTopicStatus);
+        };
     };
 };
