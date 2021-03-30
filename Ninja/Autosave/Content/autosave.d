@@ -280,7 +280,9 @@ func void _Ninja_Autosave_Init() {
         HookEngineF(CGameManager__ApplySomeSettings, MEMINT_SwitchG1G2(7, 8), Ninja_Autosave_ReadIni);
 
         // Start frame function and store handle
-        if (!FF_Active(Ninja_Autosave_Check)) {
+        if (!FF_Active(Ninja_Autosave_Check))
+        || (!Hlp_IsValidHandle(Ninja_Autosave_FF)) {
+            FF_RemoveAll(Ninja_Autosave_Check); // Just in case
             FF_ApplyExtGT(Ninja_Autosave_Check, NINJA_AUTOSAVE_DELAY, -1);
             Ninja_Autosave_FF = nextHandle;
         };
