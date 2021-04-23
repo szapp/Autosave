@@ -285,6 +285,7 @@ func void _Ninja_Autosave_Init() {
             FF_RemoveAll(Ninja_Autosave_Check); // Just in case
             FF_ApplyExtGT(Ninja_Autosave_Check, NINJA_AUTOSAVE_DELAY, -1);
             Ninja_Autosave_FF = nextHandle;
+            PM_BindInt(Ninja_Autosave_FF);
         };
 
         // Start the writer (separately from the check in FF)
