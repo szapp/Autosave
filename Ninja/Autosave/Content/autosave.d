@@ -14,10 +14,10 @@
  *     Autosave_Init();
  * - Additional adjustments can be made in the Gothic.ini (entries created on first use)
  *     [AUTOSAVE]
- *     minutes=10  // Saving frequency in minutes
+ *     minutes=5   // Saving frequency in minutes
  *     slotMin=18  // Range of saving slots to use
  *     slotMax=20  // i.e. here: use slots 18, 19 and 20
- *     events=1    // Also save after events (0 = no, 1 = yes)
+ *     events=0    // Also save after events (0 = no, 1 = yes)
  *     counter=0   // Counter in the save slot name (increased internally)
  *
  *
@@ -26,12 +26,14 @@
 
 /* Default values of constants */
 const int    NINJA_AUTOSAVE_MINUTES   = 5;
-const int    NINJA_AUTOSAVE_SLOT_MIN  = 18; // 0 is quick save
+const int    NINJA_AUTOSAVE_SLOT_MIN  = 18;  // 0 is quick save
 const int    NINJA_AUTOSAVE_SLOT_MAX  = 20;
-const int    NINJA_AUTOSAVE_EVENTS    = 1;
+const int    NINJA_AUTOSAVE_EVENTS    = 0;   // Occasionally causes issues
 const int    NINJA_AUTOSAVE_DEBUG     = 0;
 const string NINJA_AUTOSAVE_NAME_PRE  = "    - Auto Save ";
 const string NINJA_AUTOSAVE_NAME_POST = " -";
+const int    NINJA_AUTOSAVE_SLOT_MINL = -1;  // Internal
+const int    NINJA_AUTOSAVE_SLOT_MAXL = -1;  // Internal
 const int    NINJA_AUTOSAVE_DELAY     = 0;   // Internal
 const int    NINJA_AUTOSAVE_BUFFER    = 750; // Internal
 const int    NINJA_AUTOSAVE_EASE      = 0;   // Internal
@@ -223,19 +225,115 @@ func void Ninja_Autosave_OnChangeTopicStatus() {
 };
 
 /*
+ * Initialize slot range limits
+ */
+func void Ninja_Autosave_InitializeRange() {
+    // Range supported by program
+    var int slotMin; slotMin = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1220*/8196640, /*0x82F2CC*/8581836));
+    var int slotMax; slotMax = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1224*/8196644, /*0x82F2D0*/8581840));
+
+    // Range supported by menu scripts
+
+    // Load or create the save menu
+    const int zCMenu__Create_G1 = 5038016; //0x4CDFC0
+    const int zCMenu__Create_G2 = 5090272; //0x4DABE0
+    var int saveMenuPtr;
+    var int namePtr; namePtr = _@s("MENU_SAVEGAME_SAVE"); // Name fixed by program
+    const int call = 0;
+    if (CALL_Begin(call)) {
+        CALL_PtrParam(_@(namePtr));
+        CALL_PutRetValTo(_@(saveMenuPtr));
+        CALL__cdecl(MEMINT_SwitchG1G2(zCMenu__Create_G1, zCMenu__Create_G2));
+        call = CALL_End();
+    };
+
+    // Iterate over all menu entries to detect available save slots
+    var int range[2];
+    range[0] = 9999;
+    range[1] = -9999;
+    var zCMenu saveMenu; saveMenu = _^(saveMenuPtr);
+    repeat(i, saveMenu.m_listItems_numInArray); var int i;
+        const int oCMenuSavegame__GetMenuItemSlotNr_G1 = 4380384; //0x42D6E0
+        const int oCMenuSavegame__GetMenuItemSlotNr_G2 = 4390704; //0x42FF30
+        var int menuItmPtr; menuItmPtr = MEM_ReadIntArray(saveMenu.m_listItems_array, i);
+        const int call2 = 0;
+        if (CALL_Begin(call2)) {
+            CALL_PtrParam(_@(menuItmPtr));
+            CALL_PutRetValTo(_@(num));
+            CALL__thiscall(_@(saveMenuPtr), MEMINT_SwitchG1G2(oCMenuSavegame__GetMenuItemSlotNr_G1,
+                                                              oCMenuSavegame__GetMenuItemSlotNr_G2));
+            call2 = CALL_End();
+        };
+        var int num;
+        if (num < slotMin) || (num > slotMax) {
+            continue;
+        };
+        if (range[0] > num) {
+            range[0] = num;
+        };
+        if (range[1] < num) {
+            range[1] = num;
+        };
+    end;
+    if (range[0] != 9999) && (range[1] != -9999) && (range[0] != range[1]) {
+        slotMin = range[0];
+        slotMax = range[1];
+    };
+
+    // Set the limits
+    NINJA_AUTOSAVE_SLOT_MINL = slotMin;
+    NINJA_AUTOSAVE_SLOT_MAXL = slotMax;
+};
+
+/*
+ * Verify slot number range
+ */
+func void Ninja_Autosave_VerifyRange() {
+    if (NINJA_AUTOSAVE_SLOT_MINL == -1) || (NINJA_AUTOSAVE_SLOT_MAXL == -1) {
+        Ninja_Autosave_InitializeRange();
+    };
+
+    // Update the ranges
+    var int diff; diff = NINJA_AUTOSAVE_SLOT_MAX - NINJA_AUTOSAVE_SLOT_MIN;
+    var int diffL; diffL = NINJA_AUTOSAVE_SLOT_MAXL - NINJA_AUTOSAVE_SLOT_MINL;
+    if (diff < 0) {
+        var int tmp; tmp = NINJA_AUTOSAVE_SLOT_MAX;
+        NINJA_AUTOSAVE_SLOT_MAX = NINJA_AUTOSAVE_SLOT_MIN;
+        NINJA_AUTOSAVE_SLOT_MIN = tmp;
+        diff = -diff;
+    };
+    if (diff > diffL) {
+        NINJA_AUTOSAVE_SLOT_MAX -= diff - diffL;
+        diff = diffL;
+    };
+
+    if (NINJA_AUTOSAVE_SLOT_MAX > NINJA_AUTOSAVE_SLOT_MAXL) {
+        NINJA_AUTOSAVE_SLOT_MAX = NINJA_AUTOSAVE_SLOT_MAXL;
+        NINJA_AUTOSAVE_SLOT_MIN = NINJA_AUTOSAVE_SLOT_MAXL - diff;
+    };
+    if (NINJA_AUTOSAVE_SLOT_MIN < NINJA_AUTOSAVE_SLOT_MINL) {
+        NINJA_AUTOSAVE_SLOT_MIN = NINJA_AUTOSAVE_SLOT_MINL;
+        NINJA_AUTOSAVE_SLOT_MAX = NINJA_AUTOSAVE_SLOT_MINL + diff;
+    };
+};
+
+/*
  * Set and read INI settings
  */
 func void Ninja_Autosave_ReadIni() {
+    // Verify auto save slot number range (defaults)
+    Ninja_Autosave_VerifyRange();
+
     // Set values to their defaults if they do not exist
     MEM_Info("Autosave: Initializing entries in Gothic.ini.");
     if (!MEM_GothOptExists("AUTOSAVE", "minutes")) {
         MEM_SetGothOpt("AUTOSAVE", "minutes", IntToString(NINJA_AUTOSAVE_MINUTES));
     };
     if (!MEM_GothOptExists("AUTOSAVE", "slotMin")) {
-        MEM_SetGothOpt("AUTOSAVE", "slotMin", IntToString(MEMINT_SwitchG1G2(13, 18)));
+        MEM_SetGothOpt("AUTOSAVE", "slotMin", IntToString(NINJA_AUTOSAVE_SLOT_MIN));
     };
     if (!MEM_GothOptExists("AUTOSAVE", "slotMax")) {
-        MEM_SetGothOpt("AUTOSAVE", "slotMax", IntToString(MEMINT_SwitchG1G2(15, 20)));
+        MEM_SetGothOpt("AUTOSAVE", "slotMax", IntToString(NINJA_AUTOSAVE_SLOT_MAX));
     };
     if (!MEM_GothOptExists("AUTOSAVE", "events")) {
         MEM_SetGothOpt("AUTOSAVE", "events", IntToString(NINJA_AUTOSAVE_EVENTS));
@@ -251,23 +349,19 @@ func void Ninja_Autosave_ReadIni() {
     NINJA_AUTOSAVE_EVENTS   = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "events"));
     NINJA_AUTOSAVE_DEBUG    = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "debug"));
 
-    // Verify auto save slot number range
-    var int slotMax; slotMax = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1224*/8196644, /*0x82F2D0*/8581840));
-    if (NINJA_AUTOSAVE_SLOT_MIN < 0) || (NINJA_AUTOSAVE_SLOT_MIN > slotMax) {
-        NINJA_AUTOSAVE_SLOT_MIN = slotMax;
-    };
-    if (NINJA_AUTOSAVE_SLOT_MAX < 0) || (NINJA_AUTOSAVE_SLOT_MAX > slotMax) {
-        NINJA_AUTOSAVE_SLOT_MAX = slotMax;
-    };
-    if (NINJA_AUTOSAVE_SLOT_MIN > NINJA_AUTOSAVE_SLOT_MAX) {
-        NINJA_AUTOSAVE_SLOT_MAX = NINJA_AUTOSAVE_SLOT_MIN;
-    };
+    // Verify auto save slot number range (loaded values)
+    Ninja_Autosave_VerifyRange();
 
     // Convert delay to milliseconds
     if (NINJA_AUTOSAVE_MINUTES) <= 0 {
         NINJA_AUTOSAVE_MINUTES = 1;
     };
     NINJA_AUTOSAVE_DELAY = NINJA_AUTOSAVE_MINUTES * 60 * 1000;
+
+    // A bit redundant, but reflects any adjustments in the INI file
+    MEM_SetGothOpt("AUTOSAVE", "minutes", IntToString(NINJA_AUTOSAVE_MINUTES));
+    MEM_SetGothOpt("AUTOSAVE", "slotMin", IntToString(NINJA_AUTOSAVE_SLOT_MIN));
+    MEM_SetGothOpt("AUTOSAVE", "slotMax", IntToString(NINJA_AUTOSAVE_SLOT_MAX));
 };
 
 /*
