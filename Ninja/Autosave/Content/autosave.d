@@ -37,8 +37,8 @@ const int    NINJA_AUTOSAVE_SLOT_MAXL = -1;    // Internal
 const int    NINJA_AUTOSAVE_DELAY     = 0;     // Internal
 const int    NINJA_AUTOSAVE_BUFFER    = 750;   // Internal
 const int    NINJA_AUTOSAVE_EASE      = 0;     // Internal
-const int    NINJA_AUTOSAVE_TRIGGER   = 0;     // Internal
 const int    NINJA_AUTOSAVE_NEXT      = 0;     // Internal
+const int    NINJA_AUTOSAVE_TRIGGER   = FALSE; // Internal
 const int    NINJA_AUTOSAVE_WAIT      = FALSE; // Internal
 
 
@@ -103,6 +103,17 @@ func int Ninja_Autosave_Allow() {
 };
 
 /*
+ * Reset delay on saving/loading
+ */
+func void Ninja_Autosave_Reset() {
+    MEM_Info("Autosave: Reset delay.");
+    NINJA_AUTOSAVE_NEXT = TimerGT() + NINJA_AUTOSAVE_DELAY;
+    NINJA_AUTOSAVE_EASE = 0;
+    NINJA_AUTOSAVE_WAIT = FALSE;
+    NINJA_AUTOSAVE_TRIGGER = FALSE;
+};
+
+/*
  * Trigger function that is called repeatedly
  */
 func void Ninja_Autosave() {
@@ -114,11 +125,12 @@ func void Ninja_Autosave() {
         var string secStr; secStr = IntToString(sec);
         if (sec < 10) { secStr = ConcatStrings("0", secStr); };
         var string timeStr; timeStr = ConcatStrings(ConcatStrings(IntToString(min), ":"), secStr);
-        if (min > 0) || (sec > 0) { Ninja_Autosave_DebugPrint(ConcatStrings("Saving in ", timeStr)); };
+        if (NINJA_AUTOSAVE_TRIGGER) || (!MEM_Game.timeStep) { Ninja_Autosave_DebugPrint(""); }
+        else if ((min > 0) || (sec > 0)) { Ninja_Autosave_DebugPrint(ConcatStrings("Saving in ", timeStr)); };
     };
 
     // Exit if time not reached
-    if (NINJA_AUTOSAVE_NEXT < TimerGT()) {
+    if (NINJA_AUTOSAVE_NEXT > TimerGT()) {
         return;
     };
 
@@ -139,55 +151,52 @@ func void Ninja_Autosave() {
         return;
     };
 
-    // Indicate auto save
-    PrintScreen("Auto Save", -1, 1, "FONT_OLD_10_WHITE.TGA", 1);
+    // Prevent infinite loop on next frame
+    if (!NINJA_AUTOSAVE_TRIGGER) {
+        NINJA_AUTOSAVE_TRIGGER = TRUE;
 
-    // Rotate slot number
-    var int i; i = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "counter")) + 1;
-    MEM_SetGothOpt("AUTOSAVE", "counter", IntToString(i));
-    var int slot; slot = ((i-1) % (NINJA_AUTOSAVE_SLOT_MAX+1 - NINJA_AUTOSAVE_SLOT_MIN)) + NINJA_AUTOSAVE_SLOT_MIN;
+        // Indicate auto save
+        PrintScreen("Auto Save", -1, 1, "FONT_OLD_10_WHITE.TGA", 1);
 
-    // Make slot name with increasing index
-    var string slotName; slotName = NINJA_AUTOSAVE_NAME_PRE;
-    slotName = ConcatStrings(slotName, IntToString(i));
-    slotName = ConcatStrings(slotName, NINJA_AUTOSAVE_NAME_POST);
+        // Rotate slot number
+        var int i; i = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "counter")) + 1;
+        MEM_SetGothOpt("AUTOSAVE", "counter", IntToString(i));
+        var int slot; slot = ((i-1) % (NINJA_AUTOSAVE_SLOT_MAX+1 - NINJA_AUTOSAVE_SLOT_MIN)) + NINJA_AUTOSAVE_SLOT_MIN;
 
-    // Rename save slot in menu
-    if (slot) {
-        var string menuItmName; menuItmName = ConcatStrings("MENUITEM_SAVE_SLOT", IntToString(slot));
-        var int menuItmPtr; menuItmPtr = MEM_GetMenuItemByString(menuItmName);
-        if (menuItmPtr) {
-            var zCMenuItem menuItm; menuItm = _^(menuItmPtr);
-            MEM_WriteStringArray(menuItm.m_listLines_array, 0, slotName);
+        // Make slot name with increasing index
+        var string slotName; slotName = NINJA_AUTOSAVE_NAME_PRE;
+        slotName = ConcatStrings(slotName, IntToString(i));
+        slotName = ConcatStrings(slotName, NINJA_AUTOSAVE_NAME_POST);
+
+        // Rename save slot in menu
+        if (slot) {
+            var string menuItmName; menuItmName = ConcatStrings("MENUITEM_SAVE_SLOT", IntToString(slot));
+            var int menuItmPtr; menuItmPtr = MEM_GetMenuItemByString(menuItmName);
+            if (menuItmPtr) {
+                var zCMenuItem menuItm; menuItm = _^(menuItmPtr);
+                MEM_WriteStringArray(menuItm.m_listLines_array, 0, slotName);
+            };
+
+            var int infoArr; infoArr = MEM_GameManager.savegameManager + 4; // zCArray *
+            var int sinfo; sinfo = MEM_ArrayRead(infoArr, slot); // oCSavegameInfo *
+            if (sinfo) {
+                MEM_WriteString(sinfo + 64, slotName); // oCSavegameInfo->name
+            };
         };
 
-        var int infoArr; infoArr = MEM_GameManager.savegameManager + 4; // zCArray *
-        var int sinfo; sinfo = MEM_ArrayRead(infoArr, slot); // oCSavegameInfo *
-        if (sinfo) {
-            MEM_WriteString(sinfo + 64, slotName); // oCSavegameInfo->name
+        // Save game to save slot
+        const int CGameManager__Write_Savegame_G1 = 4360080; //0x428790
+        const int CGameManager__Write_Savegame_G2 = 4367056; //0x42A2D0
+        const int call = 0;
+        if (CALL_Begin(call)) {
+            CALL_IntParam(_@(slot));
+            CALL__thiscall(MEMINT_gameMan_Pointer_address, MEMINT_SwitchG1G2(CGameManager__Write_Savegame_G1,
+                                                                             CGameManager__Write_Savegame_G2));
+            call = CALL_End();
         };
-    };
 
-    // Save game to save slot
-    const int CGameManager__Write_Savegame_G1 = 4360080; //0x428790
-    const int CGameManager__Write_Savegame_G2 = 4367056; //0x42A2D0
-    const int call = 0;
-    if (CALL_Begin(call)) {
-        CALL_IntParam(_@(slot));
-        CALL__thiscall(MEMINT_gameMan_Pointer_address, MEMINT_SwitchG1G2(CGameManager__Write_Savegame_G1,
-                                                                         CGameManager__Write_Savegame_G2));
-        call = CALL_End();
+        // Never reached
     };
-};
-
-/*
- * Reset delay on saving/loading
- */
-func void Ninja_Autosave_Reset() {
-    MEM_Info("Autosave: Reset delay.");
-    NINJA_AUTOSAVE_NEXT = TimerGT() + NINJA_AUTOSAVE_DELAY;
-    NINJA_AUTOSAVE_WAIT = FALSE;
-    NINJA_AUTOSAVE_EASE = 0;
 };
 
 /*
