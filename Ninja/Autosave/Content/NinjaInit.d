@@ -7,7 +7,6 @@ func void Ninja_Autosave_Menu(var int menuPtr) {
     if (!once) {
         // Initialize Ikarus
         MEM_InitAll();
-        Ninja_Autosave_ReadIni();
         if (NINJA_VERSION < 2610) {
             MEM_SendToSpy(zERR_TYPE_FATAL, "Autosave requires at least Ninja 2.6.10 or higher.");
         };

@@ -231,64 +231,48 @@ func void Ninja_Autosave_OnChangeTopicStatus() {
 };
 
 /*
- * Initialize slot range limits
+ * Initialize slot range limits based on the program and the slots available in the menu scripts
  */
 func void Ninja_Autosave_InitializeRange() {
-    // Range supported by program
-    var int slotMin; slotMin = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1220*/8196640, /*0x82F2CC*/8581836));
-    var int slotMax; slotMax = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1224*/8196644, /*0x82F2D0*/8581840));
+    // Smallest range supported by program
+    NINJA_AUTOSAVE_SLOT_MINL = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1220*/8196640, /*0x82F2CC*/8581836));
+    NINJA_AUTOSAVE_SLOT_MAXL = MEM_ReadInt(MEMINT_SwitchG1G2(/*0x7D1224*/8196644, /*0x82F2D0*/8581840));
 
-    // Range supported by menu scripts
-
-    // Load or create the save menu
-    const int zCMenu__Create_G1 = 5038016; //0x4CDFC0
-    const int zCMenu__Create_G2 = 5090272; //0x4DABE0
-    var int saveMenuPtr;
-    var int namePtr; namePtr = _@s("MENU_SAVEGAME_SAVE"); // Name fixed by program
-    const int call = 0;
-    if (CALL_Begin(call)) {
-        CALL_PtrParam(_@(namePtr));
-        CALL_PutRetValTo(_@(saveMenuPtr));
-        CALL__cdecl(MEMINT_SwitchG1G2(zCMenu__Create_G1, zCMenu__Create_G2));
-        call = CALL_End();
+    // Find the save menu
+    var int saveMenuPtr; saveMenuPtr = MEM_GetMenuByString("MENU_SAVEGAME_SAVE"); // Name fixed by program
+    if (!saveMenuPtr) {
+        MEM_SendToSpy(zERR_TYPE_WARN, "Autosave: Save menu not found.");
+        MEM_InfoBox("Autosave: Save menu not found.");
+        return;
     };
 
-    // Iterate over all menu entries to detect available save slots
-    var int range[2];
-    range[0] = 9999;
-    range[1] = -9999;
+    // Iterate over all menu entries to narrow down the available save slots
+    var int slotMinMenu; slotMinMenu = 9999;
+    var int slotMaxMenu; slotMaxMenu = -9999;
     var zCMenu saveMenu; saveMenu = _^(saveMenuPtr);
     repeat(i, saveMenu.m_listItems_numInArray); var int i;
         const int oCMenuSavegame__GetMenuItemSlotNr_G1 = 4380384; //0x42D6E0
         const int oCMenuSavegame__GetMenuItemSlotNr_G2 = 4390704; //0x42FF30
         var int menuItmPtr; menuItmPtr = MEM_ReadIntArray(saveMenu.m_listItems_array, i);
-        const int call2 = 0;
-        if (CALL_Begin(call2)) {
+        const int call = 0;
+        if (CALL_Begin(call)) {
             CALL_PtrParam(_@(menuItmPtr));
             CALL_PutRetValTo(_@(num));
             CALL__thiscall(_@(saveMenuPtr), MEMINT_SwitchG1G2(oCMenuSavegame__GetMenuItemSlotNr_G1,
                                                               oCMenuSavegame__GetMenuItemSlotNr_G2));
-            call2 = CALL_End();
+            call = CALL_End();
         };
         var int num;
-        if (num < slotMin) || (num > slotMax) {
-            continue;
-        };
-        if (range[0] > num) {
-            range[0] = num;
-        };
-        if (range[1] < num) {
-            range[1] = num;
-        };
+        if (num < NINJA_AUTOSAVE_SLOT_MINL) || (num > NINJA_AUTOSAVE_SLOT_MAXL) { continue; };
+        if (slotMinMenu > num) { slotMinMenu = num; };
+        if (slotMaxMenu < num) { slotMaxMenu = num; };
     end;
-    if (range[0] != 9999) && (range[1] != -9999) && (range[0] != range[1]) {
-        slotMin = range[0];
-        slotMax = range[1];
-    };
 
-    // Set the limits
-    NINJA_AUTOSAVE_SLOT_MINL = slotMin;
-    NINJA_AUTOSAVE_SLOT_MAXL = slotMax;
+    // Update the limits if smaller range
+    if (slotMinMenu != 9999) && (slotMaxMenu != -9999) && (slotMinMenu != slotMaxMenu) {
+        NINJA_AUTOSAVE_SLOT_MINL = slotMinMenu;
+        NINJA_AUTOSAVE_SLOT_MAXL = slotMaxMenu;
+    };
 };
 
 /*
