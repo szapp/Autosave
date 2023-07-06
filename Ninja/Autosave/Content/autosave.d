@@ -32,13 +32,14 @@ const int    NINJA_AUTOSAVE_EVENTS    = 0;   // Occasionally causes issues
 const int    NINJA_AUTOSAVE_DEBUG     = 0;
 const string NINJA_AUTOSAVE_NAME_PRE  = "    - Auto Save ";
 const string NINJA_AUTOSAVE_NAME_POST = " -";
-const int    NINJA_AUTOSAVE_SLOT_MINL = -1;  // Internal
-const int    NINJA_AUTOSAVE_SLOT_MAXL = -1;  // Internal
-const int    NINJA_AUTOSAVE_DELAY     = 0;   // Internal
-const int    NINJA_AUTOSAVE_BUFFER    = 750; // Internal
-const int    NINJA_AUTOSAVE_EASE      = 0;   // Internal
-const int    NINJA_AUTOSAVE_TRIGGER   = 0;   // Internal
-var   int    Ninja_Autosave_FF;              // Internal
+const int    NINJA_AUTOSAVE_SLOT_MINL = -1;    // Internal
+const int    NINJA_AUTOSAVE_SLOT_MAXL = -1;    // Internal
+const int    NINJA_AUTOSAVE_DELAY     = 0;     // Internal
+const int    NINJA_AUTOSAVE_BUFFER    = 750;   // Internal
+const int    NINJA_AUTOSAVE_EASE      = 0;     // Internal
+const int    NINJA_AUTOSAVE_TRIGGER   = 0;     // Internal
+const int    NINJA_AUTOSAVE_NEXT      = 0;     // Internal
+const int    NINJA_AUTOSAVE_WAIT      = FALSE; // Internal
 
 
 /*
@@ -102,14 +103,12 @@ func int Ninja_Autosave_Allow() {
 };
 
 /*
- * The write function has to be decoupled from the FrameFunction, because writing a game save re-triggers the
- * FrameFunctions causing an infinite loop. Aside from that, the properties of other active FrameFunctions will be
- * overwritten, because of pseudo-locals in the FrameFunctions hook. This method here adds more code, but is safer.
+ * Trigger function that is called repeatedly
  */
 func void Ninja_Autosave() {
     if (NINJA_AUTOSAVE_DEBUG) {
-        var FFItem ff; ff = get(Ninja_Autosave_FF);
-        var int msTotal; msTotal = (ff.next - TimerGT()) * (ff.delay > NINJA_AUTOSAVE_BUFFER);
+        var int msTotal; msTotal = NINJA_AUTOSAVE_NEXT - TimerGT();
+        if (msTotal < 0) { msTotal = 0; };
         var int sec; sec = ((msTotal + 999) / 1000) % 60;
         var int min; min = ((msTotal + 999) / 1000) / 60;
         var string secStr; secStr = IntToString(sec);
@@ -118,92 +117,89 @@ func void Ninja_Autosave() {
         if (min > 0) || (sec > 0) { Ninja_Autosave_DebugPrint(ConcatStrings("Saving in ", timeStr)); };
     };
 
-    if (NINJA_AUTOSAVE_TRIGGER) {
-        NINJA_AUTOSAVE_TRIGGER = FALSE;
-
-        // Indicate auto save
-        PrintScreen("Auto Save", -1, 1, "FONT_OLD_10_WHITE.TGA", 1);
-
-        // Rotate slot number
-        var int i; i = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "counter")) + 1;
-        MEM_SetGothOpt("AUTOSAVE", "counter", IntToString(i));
-        var int slot; slot = ((i-1) % (NINJA_AUTOSAVE_SLOT_MAX+1 - NINJA_AUTOSAVE_SLOT_MIN)) + NINJA_AUTOSAVE_SLOT_MIN;
-
-        // Make slot name with increasing index
-        var string slotName; slotName = NINJA_AUTOSAVE_NAME_PRE;
-        slotName = ConcatStrings(slotName, IntToString(i));
-        slotName = ConcatStrings(slotName, NINJA_AUTOSAVE_NAME_POST);
-
-        // Rename save slot in menu
-        if (slot) {
-            var string menuItmName; menuItmName = ConcatStrings("MENUITEM_SAVE_SLOT", IntToString(slot));
-            var int menuItmPtr; menuItmPtr = MEM_GetMenuItemByString(menuItmName);
-            if (menuItmPtr) {
-                var zCMenuItem menuItm; menuItm = _^(menuItmPtr);
-                MEM_WriteStringArray(menuItm.m_listLines_array, 0, slotName);
-            };
-
-            var int infoArr; infoArr = MEM_GameManager.savegameManager + 4; // zCArray *
-            var int sinfo; sinfo = MEM_ArrayRead(infoArr, slot); // oCSavegameInfo *
-            if (sinfo) {
-                MEM_WriteString(sinfo + 64, slotName); // oCSavegameInfo->name
-            };
-        };
-
-        // Save game to save slot
-        const int CGameManager__Write_Savegame_G1 = 4360080; //0x428790
-        const int CGameManager__Write_Savegame_G2 = 4367056; //0x42A2D0
-        const int call = 0;
-        if (CALL_Begin(call)) {
-            CALL_IntParam(_@(slot));
-            CALL__thiscall(MEMINT_gameMan_Pointer_address, MEMINT_SwitchG1G2(CGameManager__Write_Savegame_G1,
-                                                                             CGameManager__Write_Savegame_G2));
-            call = CALL_End();
-        };
+    // Exit if time not reached
+    if (NINJA_AUTOSAVE_NEXT < TimerGT()) {
+        return;
     };
-};
 
-
-/*
- * Trigger function called repeatedly
- */
-func void Ninja_Autosave_Check() {
-    var FFItem this; this = get(Ninja_Autosave_FF);
-    if (Ninja_Autosave_Allow()) {
+    // Exit if not allowed
+    if (!Ninja_Autosave_Allow()) {
+        if (!NINJA_AUTOSAVE_WAIT) {
+            MEM_Info("Autosave: Waiting to perform auto-save.");
+            NINJA_AUTOSAVE_WAIT = TRUE;
+        };
+        return;
+    } else if (NINJA_AUTOSAVE_WAIT) {
         // After waiting, add some buffer time before immediately saving
-        if (!this.delay) {
-            this.delay = NINJA_AUTOSAVE_BUFFER + NINJA_AUTOSAVE_EASE;
-        } else {
-            NINJA_AUTOSAVE_TRIGGER = TRUE;
-        };
-        NINJA_AUTOSAVE_EASE = 0;
+        NINJA_AUTOSAVE_NEXT = TimerGT() + NINJA_AUTOSAVE_BUFFER + NINJA_AUTOSAVE_EASE;
 
-    } else if (this.delay) {
-        MEM_Info("Autosave: Waiting to perform auto-save.");
-        this.delay = 0;
+        // Reset
+        NINJA_AUTOSAVE_WAIT = FALSE;
+        NINJA_AUTOSAVE_EASE = 0;
+        return;
+    };
+
+    // Indicate auto save
+    PrintScreen("Auto Save", -1, 1, "FONT_OLD_10_WHITE.TGA", 1);
+
+    // Rotate slot number
+    var int i; i = STR_ToInt(MEM_GetGothOpt("AUTOSAVE", "counter")) + 1;
+    MEM_SetGothOpt("AUTOSAVE", "counter", IntToString(i));
+    var int slot; slot = ((i-1) % (NINJA_AUTOSAVE_SLOT_MAX+1 - NINJA_AUTOSAVE_SLOT_MIN)) + NINJA_AUTOSAVE_SLOT_MIN;
+
+    // Make slot name with increasing index
+    var string slotName; slotName = NINJA_AUTOSAVE_NAME_PRE;
+    slotName = ConcatStrings(slotName, IntToString(i));
+    slotName = ConcatStrings(slotName, NINJA_AUTOSAVE_NAME_POST);
+
+    // Rename save slot in menu
+    if (slot) {
+        var string menuItmName; menuItmName = ConcatStrings("MENUITEM_SAVE_SLOT", IntToString(slot));
+        var int menuItmPtr; menuItmPtr = MEM_GetMenuItemByString(menuItmName);
+        if (menuItmPtr) {
+            var zCMenuItem menuItm; menuItm = _^(menuItmPtr);
+            MEM_WriteStringArray(menuItm.m_listLines_array, 0, slotName);
+        };
+
+        var int infoArr; infoArr = MEM_GameManager.savegameManager + 4; // zCArray *
+        var int sinfo; sinfo = MEM_ArrayRead(infoArr, slot); // oCSavegameInfo *
+        if (sinfo) {
+            MEM_WriteString(sinfo + 64, slotName); // oCSavegameInfo->name
+        };
+    };
+
+    // Save game to save slot
+    const int CGameManager__Write_Savegame_G1 = 4360080; //0x428790
+    const int CGameManager__Write_Savegame_G2 = 4367056; //0x42A2D0
+    const int call = 0;
+    if (CALL_Begin(call)) {
+        CALL_IntParam(_@(slot));
+        CALL__thiscall(MEMINT_gameMan_Pointer_address, MEMINT_SwitchG1G2(CGameManager__Write_Savegame_G1,
+                                                                         CGameManager__Write_Savegame_G2));
+        call = CALL_End();
     };
 };
 
 /*
- * Reset delay on saving
+ * Reset delay on saving/loading
  */
 func void Ninja_Autosave_Reset() {
     MEM_Info("Autosave: Reset delay.");
-    var FFItem ff; ff = get(Ninja_Autosave_FF);
-    ff.delay = NINJA_AUTOSAVE_DELAY;
-    ff.next = TimerGT() + ff.delay;
+    NINJA_AUTOSAVE_NEXT = TimerGT() + NINJA_AUTOSAVE_DELAY;
+    NINJA_AUTOSAVE_WAIT = FALSE;
+    NINJA_AUTOSAVE_EASE = 0;
 };
 
 /*
- * Set the delay to trigger soon
+ * Set a delay to trigger soon
  */
 func void Ninja_Autosave_TriggerDelayed(var int ms) {
     // If last save occurred more than 10 seconds ago or if saving is not possible anyway
-    var FFItem ff; ff = get(Ninja_Autosave_FF);
-    if (!NINJA_AUTOSAVE_TRIGGER) && (ff.delay) {
-        if (!Ninja_Autosave_Allow()) || ((ff.delay - (ff.next - TimerGT())) > (10000 - ms)) {
+    if (!NINJA_AUTOSAVE_WAIT) {
+        var int timeSinceLast; timeSinceLast = NINJA_AUTOSAVE_DELAY - (NINJA_AUTOSAVE_NEXT - TimerGT());
+        if (!Ninja_Autosave_Allow()) || (timeSinceLast > (10000 - ms)) {
             // Trigger an auto save after a few milliseconds
-            ff.next = TimerGT() + ms;
+            NINJA_AUTOSAVE_NEXT = TimerGT() + ms;
         };
     };
 };
@@ -219,7 +215,8 @@ func void Ninja_Autosave_OnIntroduceChapter() {
  * Trigger saving on Log_SetTopicStatus
  */
 func void Ninja_Autosave_OnChangeTopicStatus() {
-    if (EBX == /*LOG_SUCCESS*/ 2) {
+    const int LOG_SUCCESS = 2;
+    if (EBX == LOG_SUCCESS) {
         Ninja_Autosave_TriggerDelayed(2000);
     };
 };
@@ -368,21 +365,12 @@ func void Ninja_Autosave_ReadIni() {
  * Initialization function to be called from Init_Global
  */
 func void _Ninja_Autosave_Init() {
-    if (_LeGo_Flags & LeGo_FrameFunctions) {
+    if (_LeGo_Flags & LeGo_Timer) {
         // Read INI settings
         Ninja_Autosave_ReadIni();
         HookEngineF(CGameManager__ApplySomeSettings, MEMINT_SwitchG1G2(7, 8), Ninja_Autosave_ReadIni);
 
-        // Start frame function and store handle
-        if (!FF_Active(Ninja_Autosave_Check))
-        || (!Hlp_IsValidHandle(Ninja_Autosave_FF)) {
-            FF_RemoveAll(Ninja_Autosave_Check); // Just in case
-            FF_ApplyExtGT(Ninja_Autosave_Check, NINJA_AUTOSAVE_DELAY, -1);
-            Ninja_Autosave_FF = nextHandle;
-            PM_BindInt(Ninja_Autosave_FF);
-        };
-
-        // Start the writer (separately from the check in FF)
+        // Start the watcher
         HookEngineF(oCGame__Render, 7, Ninja_Autosave);
 
         // Reset delay after saving/loading
