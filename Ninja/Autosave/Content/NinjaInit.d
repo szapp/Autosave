@@ -28,6 +28,6 @@ func void Ninja_Autosave_Init() {
     && (MEM_FindParserSymbol("PO_AUTOSAVE") == -1) {
         // Wrapper for "LeGo_Init" to ensure correct LeGo initialization without breaking the mod
         LeGo_MergeFlags(LeGo_Timer);
-        _Ninja_Autosave_Init();
+        Patch_Autosave_Init();
     };
 };
