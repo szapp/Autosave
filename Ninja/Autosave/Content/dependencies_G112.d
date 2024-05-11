@@ -1,3 +1,9 @@
+const int AUTOSAVE_EXE = 1;
+func int Autosave_SwitchExe(var int g1, var int g112, var int g130, var int g2) {
+    return g112;
+};
+
+
 /*
  * CGameManager::Write_Savegame does not exist in Gothic 1.12f. The function below creates the code for the function.
  */

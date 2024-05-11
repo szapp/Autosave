@@ -61,7 +61,7 @@ func int Patch_Autosave_Allow() {
     const int zCCSCamera__playing[4]       = {/*G1*/8833024, /*G1A*/9118444, /*G2*/9186136, /*G2A*/ 9245104};
 
     // Check if player is set (rare cases during loading)
-    if (!MEM_ReadInt(oCNpc__player[IDX_EXE])) {
+    if (!MEM_ReadInt(oCNpc__player[AUTOSAVE_EXE])) {
         return FALSE;
     };
 
@@ -72,7 +72,7 @@ func int Patch_Autosave_Allow() {
         enable[1] = _@(enable);
         CALL_PtrParam(_@(enable[1]));
         CALL_PutRetValTo(0);
-        CALL__thiscall(MEMINT_gameMan_Pointer_address, CGameManager__MenuEnabled[IDX_EXE]);
+        CALL__thiscall(MEMINT_gameMan_Pointer_address, CGameManager__MenuEnabled[AUTOSAVE_EXE]);
         call = CALL_End();
     };
     if (!enable) {
@@ -81,13 +81,13 @@ func int Patch_Autosave_Allow() {
     };
 
     // Not in fight or during threat
-    if (MEM_ReadInt(oCZoneMusic__s_herostatus[IDX_EXE])) {
+    if (MEM_ReadInt(oCZoneMusic__s_herostatus[AUTOSAVE_EXE])) {
         Patch_Autosave_DebugPrint("Currently in combat");
         return FALSE;
     };
 
     // Check for playing cut scene camera
-    if (MEM_ReadInt(zCCSCamera__playing[IDX_EXE])) {
+    if (MEM_ReadInt(zCCSCamera__playing[AUTOSAVE_EXE])) {
         Patch_Autosave_DebugPrint("Cut scene camera is playing");
         PATCH_AUTOSAVE_EASE = 5000;
         return FALSE;
@@ -198,11 +198,11 @@ func void Patch_Autosave() {
                 CGameManager__Write_Savegame[1] = MEM_PopIntResult();
             };
             CALL_PtrParam(_@(FALSE)); // Remove on-screen information for thumbnail
-            CALL__thiscall(MEMINT_oGame_Pointer_Address, oCGame__SetShowPlayerStatus[IDX_EXE]);
+            CALL__thiscall(MEMINT_oGame_Pointer_Address, oCGame__SetShowPlayerStatus[AUTOSAVE_EXE]);
             CALL_IntParam(_@(slot));
-            CALL__thiscall(MEMINT_gameMan_Pointer_address, CGameManager__Write_Savegame[IDX_EXE]);
+            CALL__thiscall(MEMINT_gameMan_Pointer_address, CGameManager__Write_Savegame[AUTOSAVE_EXE]);
             CALL_PtrParam(_@(TRUE));  // Turn on-screen information back on
-            CALL__thiscall(MEMINT_oGame_Pointer_Address, oCGame__SetShowPlayerStatus[IDX_EXE]);
+            CALL__thiscall(MEMINT_oGame_Pointer_Address, oCGame__SetShowPlayerStatus[AUTOSAVE_EXE]);
             call = CALL_End();
         };
     };
@@ -234,7 +234,7 @@ func void Patch_Autosave_OnIntroduceChapter() {
  */
 func void Patch_Autosave_OnChangeTopicStatus() {
     const int LOG_SUCCESS = 2;
-    var int status; status = MEMINT_SwitchExe(EBX, EBP, EBX, EBX);
+    var int status; status = Autosave_SwitchExe(EBX, EBP, EBX, EBX);
     if (status == LOG_SUCCESS) {
         Patch_Autosave_TriggerDelayed(2000);
     };
@@ -247,8 +247,8 @@ func void Patch_Autosave_InitializeRange() {
     // Smallest range supported by program
     const int SAVEGAME_SLOT_MIN_Addr[4] = {/*G1*/8196640, /*G1A*/8471012, /*G2*/8524492, /*G2A*/8581836};
     const int SAVEGAME_SLOT_MAX_Addr[4] = {/*G1*/8196644, /*G1A*/8471016, /*G2*/8524496, /*G2A*/8581840};
-    PATCH_AUTOSAVE_SLOT_MINL = MEM_ReadInt(SAVEGAME_SLOT_MIN_Addr[IDX_EXE]);
-    PATCH_AUTOSAVE_SLOT_MAXL = MEM_ReadInt(SAVEGAME_SLOT_MAX_Addr[IDX_EXE]);
+    PATCH_AUTOSAVE_SLOT_MINL = MEM_ReadInt(SAVEGAME_SLOT_MIN_Addr[AUTOSAVE_EXE]);
+    PATCH_AUTOSAVE_SLOT_MAXL = MEM_ReadInt(SAVEGAME_SLOT_MAX_Addr[AUTOSAVE_EXE]);
 
     // Find the save menu
     var int saveMenuPtr; saveMenuPtr = MEM_GetMenuByString("MENU_SAVEGAME_SAVE"); // Name fixed by program
@@ -269,7 +269,7 @@ func void Patch_Autosave_InitializeRange() {
             const int call = 0;
             CALL_PtrParam(_@(menuItmPtr));
             CALL_PutRetValTo(_@(num));
-            CALL__thiscall(_@(saveMenuPtr), oCMenuSavegame__GetMenuItemSlotNr[IDX_EXE]);
+            CALL__thiscall(_@(saveMenuPtr), oCMenuSavegame__GetMenuItemSlotNr[AUTOSAVE_EXE]);
             call = CALL_End();
         };
         var int num;
@@ -371,7 +371,7 @@ func void Patch_Autosave_Init() {
     if (_LeGo_Flags & LeGo_Timer) {
         // Read INI settings
         Patch_Autosave_ReadIni();
-        HookEngineF(CGameManager__ApplySomeSettings, MEMINT_SwitchExe(7, 7, 8, 8), Patch_Autosave_ReadIni);
+        HookEngineF(CGameManager__ApplySomeSettings, Autosave_SwitchExe(7, 7, 8, 8), Patch_Autosave_ReadIni);
 
         // Start the watcher
         HookEngineF(oCGame__Render, 7, Patch_Autosave);
@@ -384,12 +384,12 @@ func void Patch_Autosave_Init() {
         const int IntroduceChapter[4]          = {/*G1*/6678032, /*G1A*/6854224, /*G2*/6938112, /*G2A*/7320800};
         const int Log_SetTopicStatus_status[4] = {/*G1*/6633725, /*G1A*/6803886, /*G2*/6844477, /*G2A*/7225165};
         if (PATCH_AUTOSAVE_EVENTS) {
-            HookEngineF(IntroduceChapter[IDX_EXE],          7, Patch_Autosave_OnIntroduceChapter);
-            HookEngineF(Log_SetTopicStatus_status[IDX_EXE], 6, Patch_Autosave_OnChangeTopicStatus);
+            HookEngineF(IntroduceChapter[AUTOSAVE_EXE],          7, Patch_Autosave_OnIntroduceChapter);
+            HookEngineF(Log_SetTopicStatus_status[AUTOSAVE_EXE], 6, Patch_Autosave_OnChangeTopicStatus);
         } else {
             // When disabling during the game (i.e. if there was menu option), remove the hook
-            RemoveHookF(IntroduceChapter[IDX_EXE],          7, Patch_Autosave_OnIntroduceChapter);
-            RemoveHookF(Log_SetTopicStatus_status[IDX_EXE], 6, Patch_Autosave_OnChangeTopicStatus);
+            RemoveHookF(IntroduceChapter[AUTOSAVE_EXE],          7, Patch_Autosave_OnIntroduceChapter);
+            RemoveHookF(Log_SetTopicStatus_status[AUTOSAVE_EXE], 6, Patch_Autosave_OnChangeTopicStatus);
         };
     };
 };
