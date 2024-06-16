@@ -60,27 +60,25 @@ Aside from showing the time until next saving, the reason for suspending the sav
 
 - If saving is not possible at a specific time, the save is performed as soon as possible. And afterwards again at the normal interval of X minutes after the latest save. The interval is always in relation to the most recent save. That means even when manually saving, the next automatic save will be X minutes afterwards. This avoids too frequent saves.
 
-- The event-based saving can cause issues when e.g. a chapter change coincides with a world change. In general, the event-based saving is not recommended.
-
 - The default settings look like this: Save every 5 minutes and alternate over the bottom three slots.
 
-Gothic 1
-```ini
-[AUTOSAVE]
-minutes=5
-slotMin=13
-slotMax=15
-events=0
-```
+  Gothic 1
+  ```ini
+  [AUTOSAVE]
+  minutes=5
+  slotMin=13
+  slotMax=15
+  events=0
+  ```
 
-Gothic 2
-```ini
-[AUTOSAVE]
-minutes=5
-slotMin=18
-slotMax=20
-events=0
-```
+  Gothic 2
+  ```ini
+  [AUTOSAVE]
+  minutes=5
+  slotMin=18
+  slotMax=20
+  events=0
+  ```
 
 ## Installation
 
