@@ -3,7 +3,11 @@
 [![Scripts](https://github.com/szapp/Autosave/actions/workflows/scripts.yml/badge.svg)](https://github.com/szapp/Autosave/actions/workflows/scripts.yml)
 [![Validation](https://github.com/szapp/Autosave/actions/workflows/validation.yml/badge.svg)](https://github.com/szapp/Autosave/actions/workflows/validation.yml)
 [![Build](https://github.com/szapp/Autosave/actions/workflows/build.yml/badge.svg)](https://github.com/szapp/Autosave/actions/workflows/build.yml)
-[![GitHub release](https://img.shields.io/github/v/release/szapp/Autosave.svg)](https://github.com/szapp/Autosave/releases/latest)
+[![GitHub release](https://img.shields.io/github/v/release/szapp/Autosave.svg)](https://github.com/szapp/Autosave/releases/latest)  
+[![World of Gothic](https://raw.githubusercontent.com/szapp/patch-template/main/.github/actions/initialization/badges/wog.svg)](https://www.worldofgothic.de/dl/download_637.htm)
+[![Spine](https://raw.githubusercontent.com/szapp/patch-template/main/.github/actions/initialization/badges/spine.svg)](https://clockwork-origins.com/spine)
+[![Steam Gothic 1](https://img.shields.io/badge/steam-Gothic%201-2a3f5a?logo=steam&labelColor=1b2838)](https://steamcommunity.com/sharedfiles/filedetails/?id=2787012251)
+[![Steam Gothic 2](https://img.shields.io/badge/steam-Gothic%202-2a3f5a?logo=steam&labelColor=1b2838)](https://steamcommunity.com/sharedfiles/filedetails/?id=2786999914)
 
 This patch (Gothic, Gothic Sequel, Gothic 2 and Gothic 2 NotR) introduces auto saving.
 
@@ -54,6 +58,10 @@ If it does anyway, please report it [here](https://github.com/szapp/Autosave/iss
 - In order to show on-screen debug information, add `debug=1` to the section `[AUTOSAVE]` in the Gothic.ini.
 Aside from showing the time until next saving, the reason for suspending the save is displayed.
 
+- If saving is not possible at a specific time, the save is performed as soon as possible. And afterwards again at the normal interval of X minutes after the latest save. The interval is always in relation to the most recent save. That means even when manually saving, the next automatic save will be X minutes afterwards. This avoids too frequent saves.
+
+- The event-based saving can cause issues when e.g. a chapter change coincides with a world change. In general, the event-based saving is not recommended.
+
 - The default settings look like this: Save every 5 minutes and alternate over the bottom three slots.
 
 Gothic 1
@@ -90,7 +98,7 @@ The patch is also available on
 
 <table><thead><tr><th>Gothic</th><th>Gothic Sequel</th><th>Gothic II (Classic)</th><th>Gothic II: NotR</th></tr></thead>
 <tbody><tr><td><a href="https://www.worldofgothic.de/dl/download_34.htm">Version 1.08k_mod</a></td><td>Version 1.12f</td><td><a href="https://www.worldofgothic.de/dl/download_278.htm">Report version 1.30.0.0</a></td><td><a href="https://www.worldofgothic.de/dl/download_278.htm">Report version 2.6.0.0</a></td></tr></tbody>
-<tbody><tr><td colspan="4" align="center"><a href="https://github.com/szapp/Ninja">Ninja 2.8</a> or higher</td></tr></tbody></table>
+<tbody><tr><td colspan="4" align="center"><a href="https://github.com/szapp/Ninja/wiki#wiki-content">Ninja 3</a> or higher</td></tr></tbody></table>
 
 <!--
 
