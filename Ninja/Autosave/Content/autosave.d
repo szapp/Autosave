@@ -110,6 +110,14 @@ func int Patch_Autosave_Allow() {
         return FALSE;
     };
 
+    // Additional check for loading screen
+    var oCGame ogame; ogame = _^(MEM_ReadInt(MEMINT_oGame_Pointer_Address));
+    if (ogame.load_screen) {
+        Patch_Autosave_DebugPrint("Loading");
+        PATCH_AUTOSAVE_EASE = 5000;
+        return FALSE;
+    };
+
     // Check for EnforceSavingPolicy script
     if (MEM_FindParserSymbol("AllowSaving") != -1) {
         MEM_CallByString("AllowSaving");
