@@ -59,9 +59,13 @@ func int Patch_Autosave_Allow() {
     const int CGameManager__MenuEnabled[4] = {/*G1*/4362560, /*G1A*/4374000, /*G2*/4368336, /*G2A*/ 4369136};
     const int oCZoneMusic__s_herostatus[4] = {/*G1*/9299208, /*G1A*/9594720, /*G2*/9986808, /*G2A*/10111520};
     const int zCCSCamera__playing[4]       = {/*G1*/8833024, /*G1A*/9118444, /*G2*/9186136, /*G2A*/ 9245104};
+    const int oCNpc__inventory2_offset_G112 = 1360;
+    const int oCNpc__game_mode_G112        = 9581292; //0x9232EC
+    const int oCItemContainer__IsOpen_G112 = 6908608; //0x696AC0
 
     // Check if player is set (rare cases during loading)
-    if (!MEM_ReadInt(oCNpc__player[AUTOSAVE_EXE])) {
+    var int playerPtr; playerPtr = MEM_ReadInt(oCNpc__player[AUTOSAVE_EXE]);
+    if (!playerPtr) {
         return FALSE;
     };
 
@@ -74,6 +78,19 @@ func int Patch_Autosave_Allow() {
         CALL_PutRetValTo(0);
         CALL__thiscall(MEMINT_gameMan_Pointer_address, CGameManager__MenuEnabled[AUTOSAVE_EXE]);
         call = CALL_End();
+    };
+    if (enable) && (GOTHIC_BASE_VERSION == 112) {
+        // Gothic Sequel is missing a check for open inventory, stealing, and looting
+        enable = !MEM_ReadInt(oCNpc__game_mode_G112); // Not stealing or looting
+        if (enable) {
+            var int invPtr; invPtr = playerPtr + oCNpc__inventory2_offset_G112;
+            if (CALL_Begin(call2)) {
+                const int call2 = 0;
+                CALL__thiscall(_@(invPtr), oCItemContainer__IsOpen_G112);
+                call2 = CALL_End();
+            };
+            enable = !CALL_RetValAsInt();
+        };
     };
     if (!enable) {
         Patch_Autosave_DebugPrint("Engine disallows saving");
